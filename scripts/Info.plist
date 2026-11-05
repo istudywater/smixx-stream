@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>SmixxStream</string>
+<key>CFBundleIdentifier</key><string>org.smixx.stream</string>
+<key>CFBundleName</key><string>Smixx Stream</string>
+<key>CFBundleDisplayName</key><string>Smixx Stream</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.1.0</string>
+<key>CFBundleIconFile</key><string>SmixxStream.icns</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>14.2</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSCameraUsageDescription</key><string>Show your selected camera in your teaching presentation.</string>
+<key>NSMicrophoneUsageDescription</key><string>Mix selected microphones and instruments into your lesson audio.</string>
+<key>NSAudioCaptureUsageDescription</key><string>Mix audio from the applications you choose into your teaching presentation.</string>
+<key>NSHumanReadableCopyright</key><string>Copyright 2026 Bryan B. Smith. MIT License.</string>
+</dict></plist>

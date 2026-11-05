@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>SmixxAudio</string>
+<key>CFBundleIdentifier</key><string>org.smixx.audio.driver</string>
+<key>CFBundleName</key><string>Smixx Audio</string>
+<key>CFBundlePackageType</key><string>BNDL</string>
+<key>CFBundleVersion</key><string>4</string>
+<key>CFBundleShortVersionString</key><string>0.4.0</string>
+<key>CFPlugInFactories</key><dict><key>79C492A4-234F-4EB8-BB13-9183D1234F49</key><string>SmixxAudioEntryPoint</string></dict>
+<key>CFPlugInTypes</key><dict><key>443ABAB8-E7B3-491A-B985-BEB9187030DB</key><array><string>79C492A4-234F-4EB8-BB13-9183D1234F49</string></array></dict>
+<key>AudioServerPlugIn_MachServices</key><array/>
+<key>sandboxSafe</key><true/>
+</dict></plist>
