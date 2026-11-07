@@ -4,10 +4,15 @@ import ScreenCaptureKit
 import PDFKit
 import StreamCore
 import CoreImage
+import StreamMedia
+import CryptoKit
 
 struct CapturedFrame {
     let image: CGImage
     let hostTime: Double
+    var sourceID: String = ""
+    var contextID: String = ""
+    var citation: SourceCitation? = nil
 }
 final class FrameReceiver: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let queue = DispatchQueue(label: "org.smixx.stream.video", qos: .userInteractive)
@@ -43,6 +48,7 @@ final class FrameReceiver: NSObject, SCStreamOutput, SCStreamDelegate, AVCapture
     var mediaOutput: AVPlayerItemVideoOutput?
     var mediaAudio: MediaAudioTap?
     var scopeURL: URL?
+    var sourceID = ""
     var notifications: [NSObjectProtocol] = []
     var onFailure: (@Sendable (String) -> Void)?
     var frame: ((CapturedFrame) -> Void)? { didSet { receiver.onFrame = frame } }
@@ -96,9 +102,12 @@ final class FrameReceiver: NSObject, SCStreamOutput, SCStreamDelegate, AVCapture
                 url = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], bookmarkDataIsStale: &stale)
             } else { url = URL(fileURLWithPath: source.identifier) }
             _ = url.startAccessingSecurityScopedResource(); scopeURL = url
+            let values = try url.resourceValues(forKeys: [.fileSizeKey,.contentModificationDateKey])
+            let identity = "\(url.standardizedFileURL.path):\(values.fileSize ?? 0):\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+            sourceID = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x",$0) }.joined()
             if source.kind == .pdf {
                 guard let pdf = PDFDocument(url: url), !pdf.isLocked, pdf.pageCount > 0 else { throw SourceError.message("Cannot open PDF. Unlock it or choose another file.") }
-                document = pdf; renderPDF(page: source.page, zoom: 1)
+                document = pdf; renderPDF(page: source.page, zoom: source.zoom)
             } else {
                 let asset = AVURLAsset(url: url)
                 let item = AVPlayerItem(asset: asset)
@@ -117,17 +126,29 @@ final class FrameReceiver: NSObject, SCStreamOutput, SCStreamDelegate, AVCapture
     func pollMedia() {
         guard let output = mediaOutput else { return }
         let host = CACurrentMediaTime(), time = output.itemTime(forHostTime: host)
-        guard output.hasNewPixelBuffer(forItemTime: time), let pixel = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) else { return }
-        receiver.receive(pixel, time: host)
+        var displayed = CMTime.invalid
+        guard output.hasNewPixelBuffer(forItemTime: time), let pixel = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: &displayed) else { return }
+        let ci = CIImage(cvPixelBuffer: pixel)
+        guard let image = receiver.context.createCGImage(ci,from: ci.extent) else { return }
+        let seconds = displayed.isValid && displayed.isNumeric ? displayed.seconds : nil
+        frame?(CapturedFrame(image: image,hostTime: host,sourceID: sourceID,contextID: "",citation: SourceCitation(filename: scopeURL?.lastPathComponent ?? "",seconds: seconds)))
     }
-    func renderPDF(page: Int, zoom: Double) {
-        guard let document, let page = document.page(at: min(page, document.pageCount-1)) else { return }
-        let bounds = page.bounds(for: .mediaBox)
-        let scale = min(1920 / bounds.width, 1080 / bounds.height) * zoom
-        guard let ctx = CGContext(data: nil, width: Int(bounds.width * scale), height: Int(bounds.height * scale), bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
-        ctx.setFillColor(NSColor.white.cgColor); ctx.fill(CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height))
-        ctx.scaleBy(x: scale, y: scale); page.draw(with: .mediaBox, to: ctx)
-        if let image = ctx.makeImage() { frame?(CapturedFrame(image: image, hostTime: CACurrentMediaTime())) }
+    func renderPDF(page index: Int, zoom: Double) {
+        guard let document else { return }
+        let index = max(0,min(index,document.pageCount-1))
+        guard let page = document.page(at: index) else { return }
+        // PDFKit thumbnail applies crop-box origin and rotation consistently. Ink is
+        // normalized to this oriented page, not to resolution-dependent bitmap pixels.
+        let bounds = page.bounds(for: .cropBox)
+        let rotated = abs(page.rotation % 180) == 90
+        let size = rotated ? CGSize(width: bounds.height,height: bounds.width) : bounds.size
+        let base: CGFloat = min(1920/max(1,size.width),1080/max(1,size.height))
+        let scale: CGFloat = base * CGFloat(max(1,min(4,zoom)))
+        let thumbnail = page.thumbnail(of: CGSize(width: size.width*scale,height: size.height*scale),for: .cropBox)
+        var rect = CGRect(origin: .zero,size: thumbnail.size)
+        if let image = thumbnail.cgImage(forProposedRect: &rect,context: nil,hints: nil) {
+            frame?(CapturedFrame(image: image,hostTime: CACurrentMediaTime(),sourceID: sourceID,contextID: "\(sourceID)-page-\(index)",citation: SourceCitation(filename: scopeURL?.lastPathComponent ?? "",page: index+1,pages: document.pageCount)))
+        }
     }
     func stop() async {
         for token in notifications { NotificationCenter.default.removeObserver(token) }; notifications = []

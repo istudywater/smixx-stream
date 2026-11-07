@@ -1,6 +1,6 @@
 # Smixx Stream
 
-Native macOS teaching-media switcher in The Smixx Project. **Version 0.1.0 is an engineering alpha**, with a runnable local app and shared-audio integration work. It is not a certified classroom/conferencing release.
+Native macOS teaching-media switcher in The Smixx Project. **Version 0.3.0 is an engineering alpha**, with a runnable local app and shared-audio integration work. It is not a certified classroom/conferencing release.
 
 ## Run
 
@@ -17,7 +17,9 @@ Deployment target: macOS 14.2. Built and inspected on Apple Silicon; minimum-ver
 
 - Four camera, window, display, PDF or local-media source slots; one selected Program image.
 - ScreenCaptureKit window/display capture and AVFoundation camera capture.
-- Native PDF page navigation and zoom; local video/audio play, pause and seek.
+- Native PDF page navigation, direct pan/zoom and per-page pen/highlighter/eraser with persisted undo/redo; local video/audio play, pause and seek.
+- Freeze and annotate local video frames, retain snapshots, and export branded PNG handouts with filename and exact page/time.
+- Record clean Program and live annotations to H.264/AAC MP4.
 - Fit/Fill composition and a controls-free Program window; secondary-display presentation.
 - Six input channels plus Monitor and Program masters, using Desktop-derived native audio DSP.
 - Hardware-channel/application capture, duplicate-source checks, muted-by-default inputs, independent microphone monitoring and known meeting-app exclusion.
@@ -36,6 +38,22 @@ Implementation is distinct from hardware acceptance. See [verification](docs/VER
 
 For conferencing, share the clean Program window and select a compatible Smixx Bus as the meeting microphone. Keep meeting speakers on headphones, exclude the meeting application from Stream capture, and disable duplicate meeting share-audio. Do not capture a browser that also hosts the meeting. Conference reception needs a real second-participant test.
 
+## Record a lesson
+
+Click **Record lesson**, choose a new `.mp4` filename, then teach normally. Recording includes the clean Program composition and enabled Program audio channels at 1080p with a 30 fps target, H.264 video and 48 kHz stereo AAC audio. It works without a Program window, physical audio output or virtual driver. Monitor level does not alter the recording.
+
+**Stop & Save** finalizes the file; **Show saved video** reveals it in Finder. Pause presentation records a neutral slate and silence, without removing elapsed time. Stopping the display presentation does not stop the recording. Quitting during a recording finishes it before exit. Files are written to a temporary sibling and only moved to the chosen filename after successful finalization. Existing files are never overwritten. Preview mode explicitly disables recording.
+
+See [recording details](docs/RECORDING.md) and [annotation specification](docs/ANNOTATION-SPEC.md).
+
+## Annotate and export
+
+Choose a PDF, then select **Pen**, **Highlight** or **Eraser** below Program. Choose an ink color/width; Undo, Redo and Clear operate on the current page. **Hand** drags the page; pinch or Command-scroll zooms around the pointer. **Fit** restores the full page. Space-drag temporarily pans. Marks follow the page through zooming and page changes.
+
+For a local video, seek/play to the desired moment and choose **Freeze & annotate**. Draw on the retained frame; **Play** resumes video and hides its marks. **Snapshots** restores a previously captured frame. Frame timestamps are retained with the image, not sampled from the player later.
+
+**Export PNG** saves the visible annotated Program picture with a separate footer: **Smixx Stream logo bottom left**, and **original filename above page count or timestamp at bottom right**. Default size is 1920 × 1180. Existing PNGs are not overwritten. Source files are untouched; histories and frozen snapshots are stored separately in Stream's Application Support folder. Annotations are included in Program recordings; the PNG footer is not burned into videos.
+
 ## Shared audio driver
 
 Desktop's older driver does not admit Stream. An updated, source-compatible driver candidate is included in `Vendor/SmixxAudio/Driver`. `scripts/build-driver.sh` builds and tests it into `dist/SmixxAudio.driver`; **it does not install a driver or restart audio**.
@@ -44,7 +62,7 @@ The candidate preserves device UIDs, admits `org.smixx.stream`, reports writer o
 
 ## Explicit limits
 
-- Integrated Google Cast, direct AirPlay streaming, virtual camera and recording are not implemented.
+- Integrated Google Cast, direct AirPlay streaming and virtual camera are not implemented. Shapes, editable text, annotated-PDF export and camera/browser snapshot attribution remain follow-up work.
 - System-managed extended AirPlay displays may be selectable as displays, but receiver audio/sync are unverified.
 - Manual video-delay adjustment is available. Automatic timestamp-aligned A/V export and long-session sync are not complete.
 - Camera/browser capture, physical device reconnect, classroom TVs and real conferencing calls still require live acceptance.
@@ -54,7 +72,7 @@ The candidate preserves device UIDs, admits `org.smixx.stream`, reports writer o
 ## Development
 
 ```sh
-scripts/test.sh                         # Stream state/routing tests
+scripts/test.sh                         # state, annotation, PDF and recording tests
 scripts/test.sh --package-path Vendor/SmixxAudio  # inherited state tests
 scripts/test-audio.sh                   # native macOS Audio Unit signal tests
 scripts/build-driver.sh                 # driver timeline/contract tests + build

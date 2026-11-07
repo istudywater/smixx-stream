@@ -11,26 +11,17 @@ struct ProgramCanvas: View {
     @ObservedObject var store: StreamStore
     var output = false
     var body: some View {
-        GeometryReader { geo in
+        GeometryReader { geometry in
+            let w = min(geometry.size.width, geometry.size.height * 16 / 9)
+            let h = w * 9 / 16
             ZStack {
                 Color.black
-                if (!output || store.presenting) && !store.paused, let frame = store.frames[store.state.active] {
-                    let source = store.state.sources[store.state.active]
-                    let canvas = Routing.videoRect(width: 16,height: 9,canvasWidth: geo.size.width,canvasHeight: geo.size.height,scaling: .fit)
-                    let image = Routing.videoRect(width: Double(frame.image.width), height: Double(frame.image.height), canvasWidth: canvas.width, canvasHeight: canvas.height, scaling: source.scaling)
-                    Image(decorative: frame.image, scale: 1).resizable()
-                        .frame(width: image.width, height: image.height)
-                        .scaleEffect(source.kind == .pdf ? source.zoom : 1)
-                        .frame(width: canvas.width, height: canvas.height).clipped()
-                } else {
-                    VStack(spacing: 14) {
-                        Image(systemName: store.paused ? "pause.circle" : "rectangle.on.rectangle").font(.system(size: 40, weight: .ultraLight)).foregroundStyle(accent)
-                        Text(store.paused ? "Presentation paused" : output ? "Ready for the lesson" : "Your lesson starts here").font(.title2.weight(.medium))
-                        if !output { Text("Add a camera, a document, or a browser window.").font(.subheadline).foregroundStyle(.secondary) }
-                    }.foregroundStyle(.white)
+                if let image = store.programImage {
+                    Image(decorative: image,scale: 1).resizable().frame(width: w,height: h)
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
-        }.background(.black).accessibilityLabel(output ? "Student-facing Program" : "Program preview")
+                if !output { AnnotationInput(store: store).frame(width: w,height: h) }
+            }.frame(width: geometry.size.width,height: geometry.size.height)
+        }.accessibilityLabel(output ? "Student-facing Program" : "Program preview")
     }
 }
 struct ContentView: View {
@@ -39,6 +30,20 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 18) {
             header
+            HStack(spacing: 12) {
+                if store.preview { Text("PREVIEW MODE — audio and recording disabled").foregroundStyle(.orange).font(.caption.bold()) }
+                if store.recording {
+                    Circle().fill(.red).frame(width: 8,height: 8)
+                    Text(String(format: "REC %02d:%02d:%02d",store.recordingSeconds/3600,(store.recordingSeconds/60)%60,store.recordingSeconds%60)).monospacedDigit()
+                    Button("Stop & Save") { Task { await store.stopRecording() } }
+                } else {
+                    Button { store.startRecording() } label: { Label(store.recordingBusy ? "Finalizing…" : "Record lesson",systemImage: "record.circle") }
+                        .disabled(store.recordingBusy || store.preview)
+                }
+                if store.savedRecording != nil { Button("Show saved video") { store.revealRecording() } }
+                Spacer()
+                Text("Program video + audio · MP4").font(.caption).foregroundStyle(.secondary)
+            }
             if store.state.horizontal {
                 program
                 HStack(spacing: 12) { ForEach(0..<4) { sourceTile($0) } }.frame(height: 130)
@@ -60,6 +65,12 @@ struct ContentView: View {
         .padding(24).frame(minWidth: 1080,minHeight: 820)
         .background(Color(red: 0.075,green: 0.08,blue: 0.11)).preferredColorScheme(.dark).tint(accent)
         .sheet(isPresented: Binding(get: { store.configuring != nil }, set: { if !$0 { store.configuring = nil } })) { if let index = store.configuring { SourcePicker(store: store,index: index) } }
+        .alert("Recording could not be saved",isPresented: Binding(get: { store.recordingError != nil },set: { if !$0 { store.recordingError = nil } })) {
+            Button("OK") { store.recordingError = nil }
+        } message: { Text(store.recordingError ?? "") }
+        .alert("Annotation / export",isPresented: Binding(get: { store.annotationError != nil },set: { if !$0 { store.annotationError = nil } })) {
+            Button("OK") { store.annotationError = nil }
+        } message: { Text(store.annotationError ?? "") }
         .sheet(isPresented: $store.setup) { SetupView(store: store,audio: store.audio) }
     }
     private var header: some View {
@@ -68,9 +79,9 @@ struct ContentView: View {
             Text("Smixx").font(.title2.bold()) + Text(" Stream").font(.title2.bold()).foregroundColor(accent)
             Text("TEACHING STUDIO").font(.system(size: 10,weight: .semibold,design: .monospaced)).foregroundStyle(.secondary).padding(.leading,12)
             Spacer()
-            if store.presenting {
+            if store.presenting || store.recording {
                 Button { store.togglePause() } label: { Label(store.paused ? "Resume" : "Pause",systemImage: store.paused ? "play.fill" : "pause.fill") }
-                Button("Stop") { store.stopPresentation() }
+                if store.presenting { Button("Stop presenting") { store.stopPresentation() } }
             }
             Button { destinations = true } label: { Label("Present",systemImage: "display") }
                 .buttonStyle(.borderedProminent).tint(accent)
@@ -98,6 +109,7 @@ struct ContentView: View {
                 Picker("Scale",selection: Binding(get: { store.state.sources[store.state.active].scaling },set: { store.state.sources[store.state.active].scaling = $0; store.changed() })) { Text("Fit").tag(Scaling.fit); Text("Fill").tag(Scaling.fill) }.pickerStyle(.segmented).labelsHidden().frame(width: 110)
             }
             sourceControls
+            AnnotationToolbar(store: store)
             Text(store.sourceStatus[store.state.active]).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             Spacer(minLength: 0)
         }
@@ -111,7 +123,7 @@ struct ContentView: View {
                 Button { store.turnPage(1) } label: { Image(systemName: "chevron.right") }.disabled(source.page+1 >= store.pageCount).help("Next page")
                 Spacer()
                 Text("Zoom").font(.caption)
-                Slider(value: Binding(get: { source.zoom },set: { store.state.sources[store.state.active].zoom = $0; store.changed() }),in: 1...3).frame(width: 140)
+                Slider(value: Binding(get: { source.zoom },set: { store.zoomTo($0) }),in: 1...4).frame(width: 140)
                 Text("\(Int(source.zoom*100))%").font(.caption).monospacedDigit()
             }
         } else if source.kind == .media {
@@ -189,7 +201,7 @@ struct MixerView: View {
             Text(title).font(.caption.bold()).foregroundStyle(color)
             HStack(spacing: 6) { Meter(level: audio.levels[index],color: color).frame(width: 7,height: 80); Slider(value: value,in: 0...1).rotationEffect(.degrees(-90)).frame(width: 80,height: 80) }
             if index == 6 { Button(audio.monitorEnabled ? "Monitor on" : "Monitor off") { audio.monitorEnabled.toggle(); store.changed() }.controlSize(.small) }
-            else { Text(store.presenting && !store.paused ? "Sending" : "Off").font(.caption).foregroundStyle(.secondary).frame(height: 20) }
+            else { Text(!store.paused && (store.presenting || store.recording) ? (store.recording ? "Recording" : "Sending") : "Off").font(.caption).foregroundStyle(.secondary).frame(height: 20) }
             Text(index == 6 ? "Local listening" : "Student audio").font(.system(size: 9)).foregroundStyle(.secondary).frame(height: 25)
         }.padding(9).frame(maxWidth: .infinity).background(color.opacity(0.06),in: RoundedRectangle(cornerRadius: 8))
     }

@@ -73,7 +73,7 @@ struct SetupView: View {
                 }
                 Section("Displays and wireless output") {
                     Text("Use Present to open Program on a wired secondary display. For AirPlay, connect an extended display through macOS first, then select it here. Audio routing and delay need validation on your receiver.").font(.callout)
-                    Text("Integrated Google Cast, direct AirPlay streaming and virtual camera are not available in this engineering alpha.").font(.caption).foregroundStyle(.secondary)
+                    Text("Local Program recording is available through Record lesson. Integrated Google Cast, direct AirPlay streaming and virtual camera are not available in this engineering alpha.").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Layout and synchronization") {
                     Toggle("Horizontal source strip",isOn: Binding(get: { store.state.horizontal },set: { store.state.horizontal = $0; store.changed() }))

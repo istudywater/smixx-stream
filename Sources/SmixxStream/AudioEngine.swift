@@ -21,6 +21,8 @@ import StreamCore
     private var ticks = 0
     var current = StreamState()
     var outputEnabled = false
+    var recordingEnabled = false
+    var recordingMuted = false
     var sourceFailures: Set<Int> = []
     init(preview: Bool) {
         dsp = sm_create()!
@@ -112,16 +114,25 @@ import StreamCore
             let channel = current.channels[i]
             let ready = (inputs[i] != nil || mediaSlots.contains(i)) && !sourceFailures.contains(i)
             let gain: Float = ready && !channel.muted ? Float(channel.gain) : 0
+            sm_set_gain(dsp, Int32(i), 1, recordingEnabled && !recordingMuted ? gain : 0)
             sm_set_gain(dsp, Int32(i), 0, program != nil && outputEnabled ? gain : 0)
             sm_set_gain(dsp, Int32(i), 3, monitor != nil && channel.monitor ? gain : 0)
         }
+        sm_set_master(dsp, 1, recordingEnabled && !recordingMuted ? Float(current.programGain) : 0)
         sm_set_master(dsp, 0, program != nil && outputEnabled ? Float(current.programGain) : 0)
         sm_set_master(dsp, 3, monitor != nil && monitorEnabled ? Float(current.monitorGain) : 0)
     }
+    func prepareRecording() throws {
+        // Bus 1 is reserved for the recorder; physical Program uses 0, Monitor 3.
+        // Prepare only while its sole consumer is stopped.
+        try checked(sm_prepare_bus(dsp, 1, 48000), "Prepare recording audio")
+        recordingEnabled = true; apply()
+    }
+    func endRecording() { recordingEnabled = false; sm_set_master(dsp, 1, 0); apply() }
     private func tick() {
         ticks += 1
         for i in 0..<6 { levels[i] = sm_take_source_peak(dsp, Int32(i)) }
-        levels[6] = sm_take_output_peak(dsp, 3); levels[7] = sm_take_output_peak(dsp, 0)
+        levels[6] = sm_take_output_peak(dsp, 3); levels[7] = max(sm_take_output_peak(dsp, 0), sm_take_output_peak(dsp, 1))
         if ticks % 40 == 0 { refresh(); reconcile(current, presenting: outputEnabled) }
     }
     var diagnostics: String {

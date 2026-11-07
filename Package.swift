@@ -6,7 +6,10 @@ let package = Package(
     dependencies: [.package(path: "Vendor/SmixxAudio")],
     targets: [
         .target(name: "StreamCore"),
-        .executableTarget(name: "SmixxStream", dependencies: ["StreamCore", .product(name: "SmixxCore", package: "SmixxAudio"), .product(name: "MixerDSP", package: "SmixxAudio")]),
-        .testTarget(name: "StreamCoreTests", dependencies: ["StreamCore"])
+        .target(name: "StreamMedia", dependencies: ["StreamCore"]),
+        .executableTarget(name: "SmixxStream", dependencies: ["StreamCore", "StreamMedia", .product(name: "SmixxCore", package: "SmixxAudio"), .product(name: "MixerDSP", package: "SmixxAudio")]),
+        .testTarget(name: "SmixxStreamTests", dependencies: ["SmixxStream"]),
+        .testTarget(name: "StreamCoreTests", dependencies: ["StreamCore"]),
+        .testTarget(name: "StreamMediaTests", dependencies: ["StreamMedia", .product(name: "MixerDSP", package: "SmixxAudio")])
     ], swiftLanguageModes: [.v5]
 )

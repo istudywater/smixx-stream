@@ -16,7 +16,7 @@ Engineering alpha 0.1.0, Apple Silicon, Swift 6.2.4 command-line tools. Deployme
 | Local media | Generated H.264/AAC fixture, loaded through file picker, verified time progression, video frames and playback controls; no physical audio destination enabled |
 | Camera and browser capture | Implemented/compiled, not exercised with permissions/live sources during this pass |
 | Installed driver / real conference / wired TV | Not run; requires actual destination and separately managed shared-driver deployment |
-| Casting, virtual camera, recording | Not implemented |
+| Casting, virtual camera | Not implemented |
 | Physical latency / long-session A/V / four-source performance | Not measured; manual video delay available; automatic alignment remains incomplete |
 | Public distribution | Not Developer ID signed/notarized; no release uploaded |
 
@@ -32,3 +32,15 @@ The first Swift invocations encountered restricted compiler-cache writes and CLT
 6. Confirm that the remote participant receives readable content, microphone and media exactly once, with no meeting return feedback.
 
 Do not publish a supported receiver/client claim before this evidence exists. The Obsidian compatibility plan remains the longer-term acceptance reference.
+
+## November 6 — recording 0.2.0
+
+Nine app-package tests pass with normal macOS encoder access. Four new recording tests cover a playable H.264/AAC file with decoded source changes and non-silent audio, track duration agreement, independent shared-DSP recording without physical outputs, existing-file protection and common composition rendering. Sandbox encoder restrictions require running these tests with macOS service access. Annotation drawing and PNG export remain specification only. Hardware capture, hour-long recording and physical A/V synchronization are not covered by these short tests.
+
+The 0.2.0 release app built successfully. Native UI Record → Pause → Stop & Save produced a 1920 × 1080 H.264 MP4 with stereo 48 kHz AAC; ffprobe measured video 7.17 s and audio 7.15 s. This isolated temporary-session check used a slate and silent channels without changing saved settings.
+
+## November 6 — annotation 0.3.0
+
+15 tests pass: source-coordinate transforms and clipping, history isolation/serialization, page/time attribution, opaque sRGB PNG encoding and file protection, rotated/cropped PDF high-resolution rendering, frozen snapshot archive recovery, plus prior state/recording checks. The MP4 test decodes and checks a drawn stroke.
+
+Native temporary-session checks loaded a PDF, drew a stroke, exported and visually inspected its PNG with the revised footer, changed pages and confirmed history isolation/restoration, and exercised direct keyboard zoom/pan. A local video was sought to 2 seconds, frozen, annotated and exported; its footer `00:00:02.000` matches the fixture's burned-in frame timecode. A 51.53-second native Program recording includes an additional stroke drawn while recording, verified by decoding a later frame. Program remained 1920 × 1080; its MP4 has no PNG footer. Test recording audio channels were muted; synthetic non-silent audio remains covered by automated tests. No physical microphone/camera sync, real TV/conference or hour-long acceptance claim is made.
